@@ -4,7 +4,6 @@ import {
   createClient,
   deleteClient,
   getClientById,
-  getOwnedClient,
   listClients,
 } from "../services/oauth-client.service.js";
 import { OIDC_CONFIG } from "../config/oidc.config.js";
@@ -91,11 +90,6 @@ export const getClientInfo = async (req: Request, res: Response) => {
 export const getClients = async (req: Request, res: Response) => {
   const clients = await listClients(req.userId as string);
   return res.json({ clients: clients.map((client) => toClientDto(client)) });
-};
-
-export const getClient = async (req: Request, res: Response) => {
-  const client = await getOwnedClient(String(req.params.clientId), req.userId as string);
-  return client ? res.json(toClientDto(client)) : clientNotFound(res);
 };
 
 export const removeClient = async (req: Request, res: Response) => {

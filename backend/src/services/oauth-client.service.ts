@@ -43,9 +43,6 @@ export async function authenticateClient(clientId: string, clientSecret: string)
 export const listClients = (owner: string) =>
   OAuthClient.find({ owner }).select("-clientSecretHash");
 
-export const getOwnedClient = (clientId: string, owner: string) =>
-  OAuthClient.findOne({ clientId, owner }).select("-clientSecretHash");
-
 export async function deleteClient(clientId: string, owner: string) {
   const result = await OAuthClient.deleteOne({ clientId, owner });
   if (result.deletedCount === 0) return false;
