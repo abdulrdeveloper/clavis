@@ -4,7 +4,6 @@ import {
   createClient,
   deleteClient,
   getClientById,
-  getOwnedClient,
   listClients,
 } from "../services/oauth-client.service.js";
 import { OIDC_CONFIG } from "../config/oidc.config.js";
@@ -33,7 +32,7 @@ const registerClientSchema = z.object({
   redirectUris: z
     .array(
       z.string().refine((uri) => isAllowedUrl(uri), {
-        message: "redirectUris must be https URLs without a fragment (http://localhost is allowed in development)",
+        message: "Redirect URLs must start with https:// (http://localhost works while developing) and can't contain #.",
       }),
     )
     .min(1, "At least one redirect URI is required")
@@ -81,7 +80,6 @@ export const registerClient = async (req: Request, res: Response) => {
   return res.status(201).json({ ...toClientDto(client), client_secret: clientSecret });
 };
 
-// Public: only the display name and description, so consent can show which app is asking.
 export const getClientInfo = async (req: Request, res: Response) => {
   const clientId = typeof req.query.client_id === "string" ? req.query.client_id : "";
   const client = clientId ? await getClientById(clientId) : null;
@@ -92,11 +90,6 @@ export const getClientInfo = async (req: Request, res: Response) => {
 export const getClients = async (req: Request, res: Response) => {
   const clients = await listClients(req.userId as string);
   return res.json({ clients: clients.map((client) => toClientDto(client)) });
-};
-
-export const getClient = async (req: Request, res: Response) => {
-  const client = await getOwnedClient(String(req.params.clientId), req.userId as string);
-  return client ? res.json(toClientDto(client)) : clientNotFound(res);
 };
 
 export const removeClient = async (req: Request, res: Response) => {
