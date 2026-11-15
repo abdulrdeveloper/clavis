@@ -175,9 +175,10 @@ The template is set up for **Heroku** (backend) and **Vercel** (frontend), and
 works on any Node.js host.
 
 **Backend on Heroku**
-- `backend/Procfile` runs `node dist/server.js`.
-- The app lives in a subfolder, so push it with
-  `git subtree push --prefix backend heroku main`.
+- In the Heroku dashboard, open the app's Deploy tab, connect this GitHub
+  repository and deploy the `main` branch. No CLI is needed.
+- The root `package.json` installs the backend with pnpm, compiles it with
+  `tsc`, and the root `Procfile` runs `node backend/dist/server.js`.
 - Add every backend variable as a Config Var, with `NODE_ENV=production`.
 
 **Frontend on Vercel**
