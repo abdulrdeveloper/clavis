@@ -1,0 +1,12 @@
+{
+  "name": "clavis",
+  "private": true,
+  "scripts": {
+    "postinstall": "corepack pnpm@11.8.0 install --dir backend --frozen-lockfile --prod=false",
+    "build": "corepack pnpm@11.8.0 --dir backend run build",
+    "start": "node backend/dist/server.js"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

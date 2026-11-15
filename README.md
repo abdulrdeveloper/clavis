@@ -5,10 +5,21 @@
 <h3 align="center">Open-source identity for your apps: sign-up, sign-in, and OpenID Connect, self-hosted.</h3>
 
 <p align="center">
-  Clavis is an open-source identity platform, built in the same spirit as Clerk. Users sign up, verify their email and sign in once. Your other apps then receive standard OpenID Connect tokens. You run it on your own infrastructure with MongoDB, Redis and Resend.
+  Clavis is an open-source identity platform, built in the same spirit as Clerk. Users sign up, verify their email and sign in once. Your other apps then receive standard OpenID Connect tokens. Use the hosted version, or run it on your own infrastructure with MongoDB, Redis and Resend.
 </p>
 
 <p align="center">
+  <a href="https://clavis.abdulrdeveloper.me"><strong>Open Clavis</strong></a>
+  ·
+  <a href="https://clavis.abdulrdeveloper.me/developers">Register an app</a>
+  ·
+  <a href="#run-it-yourself">Self-host</a>
+  ·
+  <a href="https://github.com/abdulrdeveloper/clavis/issues">Report a bug</a>
+</p>
+
+<p align="center">
+  <a href="https://clavis.abdulrdeveloper.me"><img alt="Live" src="https://img.shields.io/badge/live-clavis.abdulrdeveloper.me-050506.svg" /></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <img alt="Express 5" src="https://img.shields.io/badge/Express-5-black.svg" />
   <img alt="React 18" src="https://img.shields.io/badge/React-18-61dafb.svg" />
@@ -33,6 +44,24 @@ Clavis covers the parts that are easy to get wrong, already built and tested:
   HttpOnly cookies that JavaScript cannot read.
 
 It is focused on a few things done well: email and password accounts, a hosted-style sign-in UI, and an OpenID Connect provider for your other apps. Social login and an admin dashboard are not included yet.
+
+## Try it
+
+Clavis is live at **[clavis.abdulrdeveloper.me](https://clavis.abdulrdeveloper.me)**.
+
+1. [Create an account](https://clavis.abdulrdeveloper.me/register) and enter
+   the 6-digit code sent to your email.
+2. Open the [dashboard](https://clavis.abdulrdeveloper.me/dashboard) to see
+   your signed-in devices and the apps you have connected.
+3. Open [Developers](https://clavis.abdulrdeveloper.me/developers) and click
+   **New app** to get a client ID and secret. The page also shows the issuer
+   URL and discovery document to give your OpenID Connect library.
+4. Add "Sign in with Clavis" to your site using the
+   [OpenID Connect flow](#use-it-as-a-login-provider-for-other-sites-openid-connect)
+   below.
+
+The hosted version is run by the maintainer. If you want full control over
+accounts, signing keys and data, [run your own copy](#run-it-yourself).
 
 ## Features
 
@@ -150,6 +179,9 @@ Backend (`backend/.env`):
 | `APP_NAME` | No | Sender name shown in emails |
 | `UPSTASH_REDIS_REST_URL` | Yes | Upstash Redis REST URL |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes | Upstash Redis REST token |
+| `ISSUER_URL` | Yes in production | Public URL of the backend, used as the OpenID Connect issuer |
+| `OIDC_PRIVATE_KEY` | Yes in production | RSA private key that signs ID tokens. Generate it with `pnpm generate:keys` |
+| `OIDC_KEY_ID` | No | Key id in the token header, default `clavis-key-v1` |
 
 Frontend (`frontend/.env`):
 
@@ -171,29 +203,41 @@ Never commit `.env` files. Both folders include a `.env.example`.
 
 ### Deploy
 
-The template is set up for **Heroku** (backend) and **Vercel** (frontend), and
-works on any Node.js host.
+The hosted version runs the frontend on **Vercel** and the backend on
+**Heroku**. Clavis works on any Node.js host, but these two need no extra
+setup.
 
 **Backend on Heroku**
-- `backend/Procfile` runs `node dist/server.js`.
-- The app lives in a subfolder, so push it with
-  `git subtree push --prefix backend heroku main`.
-- Add every backend variable as a Config Var, with `NODE_ENV=production`.
+- Create an app in the Heroku dashboard. In its Deploy tab, connect this GitHub
+  repository and deploy the `main` branch. No CLI is needed, and you can turn
+  on automatic deploys for `main`.
+- Heroku builds from the repository root. The root `package.json` installs the
+  backend with pnpm and compiles it with `tsc`, and the root `Procfile` runs
+  `node backend/dist/server.js`.
+- In Settings, add every backend variable as a Config Var, with
+  `NODE_ENV=production`, `FRONTEND_URL` set to your frontend URL (for the
+  hosted version, `https://clavis.abdulrdeveloper.me`) and `ISSUER_URL` set to
+  the app's own URL, shown under Domains.
 
 **Frontend on Vercel**
-- Set the Root Directory to `frontend` and add `VITE_API_URL`.
+- Set the Root Directory to `frontend` and set `VITE_API_URL` to the backend
+  URL.
 - `frontend/vercel.json` rewrites all routes to `index.html`.
+
+After both are live, open `/health` on the backend to check it is running,
+then sign up on the frontend.
 
 **Cookies across domains**
 
 Some browsers, Safari in particular, block cookies sent between different
 sites. Put the API on a subdomain of the frontend's domain, for example
 `app.example.com` and `api.example.com`, and set `COOKIE_SAMESITE=lax`. Use
-`none` only when that is not possible.
+`none` only when that is not possible. The hosted version uses `none` for now,
+because its API runs on a `herokuapp.com` address.
 
 ## API
 
-All routes are under `/api/auth`.
+Account routes are under `/api/auth`.
 
 | Method | Route | What it does |
 | --- | --- | --- |
@@ -209,6 +253,21 @@ All routes are under `/api/auth`.
 | `POST` | `/forgot-password` | Send a password reset code |
 | `POST` | `/verify-reset-otp` | Check a reset code |
 | `POST` | `/reset-password` | Set a new password and sign out every device |
+
+App and consent routes are under `/api/oauth`.
+
+| Method | Route | What it does |
+| --- | --- | --- |
+| `GET` | `/client-info` | Return an app's name for the consent screen |
+| `POST` | `/consent` | Allow an app and continue the sign-in |
+| `GET` | `/clients` | List the apps this user registered |
+| `POST` | `/clients` | Register an app and return its secret once |
+| `DELETE` | `/clients/:clientId` | Delete an app |
+| `GET` | `/grants` | List the apps this user has allowed |
+| `DELETE` | `/grants/:clientId` | Remove an app's access |
+
+The OpenID Connect endpoints (`/.well-known/*` and `/oauth/*`) are listed in
+the [OpenID Connect section](#use-it-as-a-login-provider-for-other-sites-openid-connect).
 
 `GET /health` returns `{ "status": "Welcome to Clavis!" }` for uptime checks.
 
@@ -236,20 +295,25 @@ All routes are under `/api/auth`.
 ## Project layout
 
 ```text
+package.json             Heroku build from the repository root (installs and builds backend/)
+Procfile                 Heroku start command
 backend/
   server.ts              Startup, env checks, database connection
-  src/config/            Auth settings, cookies, validation schemas, database
-  src/controllers/       One file per auth route
+  src/config/            Auth and OIDC settings, cookies, validation schemas, database
+  src/routes/            Account, OAuth and OpenID Connect routes
+  src/controllers/       Request handlers, one file per feature
   src/middlewares/       Auth, validation, rate limit and error handling
-  src/services/          OTP, email and Redis
-  src/utils/             Tokens and the public user object
-  src/models/            Mongoose user model
+  src/services/          Sessions, tokens, signing keys, OTP, email, Redis and OAuth clients
+  src/utils/             Tokens, user agents and the public user object
+  src/models/            Mongoose models for users, OAuth clients and grants
+  src/scripts/           generate:keys and new-client commands
 frontend/
-  src/pages/             Auth pages and the dashboard
+  src/pages/             Landing page, auth pages, dashboard and Developers
   src/components/        Layout, form fields and route guards
   src/context/           AuthProvider and useAuth
   src/lib/               API client with silent refresh
   src/config/            Site branding
+  public/                Favicon, app icons and social preview image
 ```
 
 ## Project status
@@ -257,7 +321,7 @@ frontend/
 The full flow, from registration to logout, is tested end to end against real
 MongoDB and Upstash, in the API and in a headless browser.
 
-One limitation is intentional, to keep the template simple:
+One limitation is intentional, to keep Clavis simple:
 
 - **Unverified email squatting.** If someone registers another person's email
   and never verifies it, the real owner can still register, or recover the
@@ -272,11 +336,9 @@ standard OIDC library (for example `openid-client`, Auth.js / NextAuth, or Passp
 
 **Environment variables**
 
-| Variable | Purpose |
-|---|---|
-| `ISSUER_URL` | Public URL of the backend, for example `https://auth.example.com`. Required in production. |
-| `OIDC_PRIVATE_KEY` | RSA private key used to sign tokens. Generate it with `pnpm generate:keys`. |
-| `OIDC_KEY_ID` | Key id placed in the token header, for example `clavis-key-v1`. |
+Set `ISSUER_URL`, `OIDC_PRIVATE_KEY` and `OIDC_KEY_ID` as described in
+[Configuration](#configuration). Without `OIDC_PRIVATE_KEY`, development uses a
+temporary key that changes on every restart, and production refuses to start.
 
 **Endpoints**
 
