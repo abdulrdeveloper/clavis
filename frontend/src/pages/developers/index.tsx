@@ -30,21 +30,28 @@ function Value({ label, value }: { label: string; value: string }) {
   );
 }
 
-function NewAppForm({ onCreated, onCancel }: { onCreated: (app: Created) => void; onCancel: () => void }) {
+type NewAppFormProps = {
+  saving: boolean;
+  onSavingChange: (saving: boolean) => void;
+  onCreated: (app: Created) => void;
+  onCancel: () => void;
+};
+
+function NewAppForm({ saving, onSavingChange, onCreated, onCancel }: NewAppFormProps) {
   const [name, setName] = useState("");
   const [uris, setUris] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (saving) return;
     const redirectUris = uris.split(/\s+/).filter(Boolean);
     if (redirectUris.length === 0) {
       setError("Add at least one redirect URL.");
       return;
     }
-    setSaving(true);
+    onSavingChange(true);
     setError("");
     try {
       const created = await apiRequest<Created>("/oauth/clients", {
@@ -54,7 +61,7 @@ function NewAppForm({ onCreated, onCancel }: { onCreated: (app: Created) => void
       onCreated(created);
     } catch (err) {
       setError(getErrorMessage(err));
-      setSaving(false);
+      onSavingChange(false);
     }
   }
 
@@ -113,6 +120,7 @@ export function DevelopersPage() {
   const [loadError, setLoadError] = useState(false);
   const [issuer, setIssuer] = useState(API_ORIGIN);
   const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
   const [pending, setPending] = useState<App | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -136,6 +144,7 @@ export function DevelopersPage() {
   }, [load]);
 
   function onCreated(app: Created) {
+    setSaving(false);
     setCreating(false);
     setCreated(app);
     setApps((list) => [app, ...(list ?? [])]);
@@ -164,7 +173,12 @@ export function DevelopersPage() {
         title="Your apps"
         description="Each app gets its own client ID and secret."
         action={
-          <button type="button" onClick={() => setCreating(true)} className={`${buttonStyles.primary} inline-flex shrink-0 items-center gap-1.5`}>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            disabled={saving || created !== null}
+            className={`${buttonStyles.primary} inline-flex shrink-0 items-center gap-1.5`}
+          >
             <Plus size={15} aria-hidden="true" />
             New app
           </button>
@@ -225,8 +239,8 @@ export function DevelopersPage() {
         </div>
       </Panel>
 
-      <Modal open={creating} title="New app" onDismiss={() => setCreating(false)} width="30rem">
-        <NewAppForm onCreated={onCreated} onCancel={() => setCreating(false)} />
+      <Modal open={creating} title="New app" onDismiss={saving ? undefined : () => setCreating(false)} width="30rem">
+        <NewAppForm saving={saving} onSavingChange={setSaving} onCreated={onCreated} onCancel={() => setCreating(false)} />
       </Modal>
 
       <Modal open={created !== null} title="Save your client secret" width="32rem">
