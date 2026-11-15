@@ -11,6 +11,18 @@ type ApiRequestOptions = {
   data?: unknown;
 };
 
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 let refreshPromise: Promise<boolean> | null = null;
 
 function refreshSession(): Promise<boolean> {
@@ -59,14 +71,16 @@ export async function apiRequest<T>(
   }
 
   const body = (await response.json().catch(() => null)) as
-    | ({ message?: string; error_description?: string } & T)
+    | ({ message?: string; error_description?: string; code?: string } & T)
     | null;
 
   if (!response.ok) {
-    throw new Error(
+    throw new ApiError(
       body?.error_description ??
         body?.message ??
         "Something went wrong. Please try again in a moment.",
+      response.status,
+      body?.code,
     );
   }
 

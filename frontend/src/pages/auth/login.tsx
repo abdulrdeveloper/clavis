@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth, type AuthUser } from "../../context/auth-context";
 import { AuthHeader } from "../../components/auth-layout";
 import {
@@ -7,14 +7,31 @@ import {
   PasswordField,
   SubmitButton,
 } from "../../components/auth-fields";
-import { FormError } from "../../components/toast";
-import { apiRequest, getErrorMessage } from "../../lib/api";
+import { FormError, useToast } from "../../components/toast";
+import { ApiError, apiRequest, getErrorMessage } from "../../lib/api";
+import { getOtpCooldownKey, startOtpCooldown } from "../../lib/otp-cooldown";
 
 export function LoginPage() {
   const { setUser } = useAuth();
+  const navigate = useNavigate();
+  const { showError, showSuccess } = useToast();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  async function sendToEmailVerification() {
+    try {
+      const { resendAfter } = await apiRequest<{ resendAfter: number }>(
+        "/auth/resend-otp",
+        { method: "POST", data: { email: form.email } },
+      );
+      startOtpCooldown(getOtpCooldownKey(form.email, "verify"), resendAfter);
+      showSuccess("Verify your email to finish signing in. We sent a code to your inbox.");
+    } catch (resendError) {
+      showError(getErrorMessage(resendError));
+    }
+    navigate(`/verify-email?email=${encodeURIComponent(form.email)}`);
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -27,6 +44,13 @@ export function LoginPage() {
       });
       setUser(response.user);
     } catch (requestError) {
+      if (
+        requestError instanceof ApiError &&
+        requestError.code === "email_not_verified"
+      ) {
+        await sendToEmailVerification();
+        return;
+      }
       setError(getErrorMessage(requestError));
       setLoading(false);
     }

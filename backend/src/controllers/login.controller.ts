@@ -14,8 +14,15 @@ async function loginUser(req: Request, res: Response) {
   const user = await userModel.findOne({ email }).select("+password");
   const isPasswordValid = await bcrypt.compare(password, user?.password ?? TIMING_HASH);
 
-  if (!user || !isPasswordValid || !user.isEmailVerified) {
+  if (!user || !isPasswordValid) {
     return res.status(401).json({ message: "Invalid email or password." });
+  }
+
+  if (!user.isEmailVerified) {
+    return res.status(403).json({
+      code: "email_not_verified",
+      message: "Please verify your email before signing in.",
+    });
   }
 
   await startSession(req, res, user._id);
